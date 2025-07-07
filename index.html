@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EUA vs UKA GBP Differential</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background-color: #f4f4f4; }
+  </style>
+</head>
+<body>
+  <h2>EUA vs UKA GBP Differential (Past 1 Year)</h2>
+  <canvas id="differentialChart" height="100"></canvas>
+  <table id="differentialTable">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>EUA (EUR)</th>
+        <th>EUR/GBP</th>
+        <th>EUA (GBP)</th>
+        <th>UKA (GBP)</th>
+        <th>GBP Differential</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const startDate = new Date();
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    const endDate = new Date();
+
+    const formatDate = date => date.toISOString().split('T')[0];
+
+    async function fetchExchangeRate(date) {
+      const res = await fetch(`https://api.exchangerate.host/${date}?base=EUR&symbols=GBP`);
+      const data = await res.json();
+      return data.rates.GBP;
+    }
+
+    async function fetchMockPrices(type) {
+      // Simulate 1 year of daily prices
+      const prices = [];
+      let base = type === 'EUA' ? 80 : 50;
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        const dateStr = formatDate(new Date(d));
+        const price = base + (Math.random() - 0.5) * 10;
+        prices.push({ date: dateStr, price: parseFloat(price.toFixed(2)) });
+      }
+      return prices;
+    }
+
+    async function buildTable() {
+      const euaPrices = await fetchMockPrices('EUA');
+      const ukaPrices = await fetchMockPrices('UKA');
+      const tbody = document.querySelector('#differentialTable tbody');
+      const labels = [], diffs = [];
+
+      for (let i = 0; i < euaPrices.length; i++) {
+        const date = euaPrices[i].date;
+        const euaEUR = euaPrices[i].price;
+        const ukaGBP = ukaPrices[i].price;
+        const rate = await fetchExchangeRate(date);
+        const euaGBP = parseFloat((euaEUR * rate).toFixed(2));
+        const diff = parseFloat((euaGBP - ukaGBP).toFixed(2));
+
+        labels.push(date);
+        diffs.push(diff);
+
+        const row = `<tr>
+          <td>${date}</td>
+          <td>${euaEUR}</td>
+          <td>${rate.toFixed(4)}</td>
+          <td>${euaGBP}</td>
+          <td>${ukaGBP}</td>
+          <td>${diff}</td>
+        </tr>`;
+        tbody.insertAdjacentHTML('beforeend', row);
+      }
+
+      new Chart(document.getElementById('differentialChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'GBP Differential (EUA - UKA)',
+            data: diffs,
+            borderColor: 'blue',
+            fill: false,
+            tension: 0.1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { display: false },
+            y: { title: { display: true, text: 'GBP' } }
+          }
+        }
+      });
+    }
+
+    buildTable();
+  </script>
+</body>
+</html>
